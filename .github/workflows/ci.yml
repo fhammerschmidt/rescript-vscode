@@ -132,3 +132,7 @@ jobs:
       with:
         name: rescript-vscode-${{ steps.vars.outputs.sha_short }}.vsix
         path: rescript-vscode-${{ steps.vars.outputs.sha_short }}.vsix
+
+    - name: Publish extension as pre-release
+      if: github.ref == 'refs/heads/master'
+      run: npx vsce publish --pat ${{ secrets.MARKETPLACE_TOKEN }} --pre-release
