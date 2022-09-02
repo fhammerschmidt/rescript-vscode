@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [ master ]
+    tags: "*.*.*"
   pull_request:
     branches: [ master ]
 
@@ -127,6 +128,11 @@ jobs:
         COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: echo "::set-output name=sha_short::${COMMIT_SHA:0:7}"
 
+    - name: Store tag name
+      id: tag_name
+      if: startsWith(github.ref, 'refs/tags/')
+      run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
+
     - name: Increment pre-release version
       if: github.ref == 'refs/heads/master'
       id: increment_pre_release
@@ -137,17 +143,15 @@ jobs:
 
     - name: Package Extension
       if: github.ref != 'refs/heads/master'
-      run: npx vsce package  -o rescript-vscode-${{ steps.vars.outputs.sha_short }}.vsix
-
-    - name: Package Extension release version (if not already published)
-      env:
-        RELEASE_VERSION: ${{ steps.increment_pre_release.outputs.release_version }}
-      if: github.ref == 'refs/heads/master' && "${{ env.RELEASE_VERSION != '' }}"
-      run: npx vsce package  -o rescript-vscode-${{ env.RELEASE_VERSION }}.vsix ${{ env.RELEASE_VERSION }} --no-git-tag-version
+      run: npx vsce package -o rescript-vscode-${{ steps.vars.outputs.sha_short }}.vsix
 
     - name: Package Extension pre-release version
       if: github.ref == 'refs/heads/master'
-      run: npx vsce package  -o rescript-vscode-${{ steps.increment_pre_release.outputs.new_version }}.vsix ${{ steps.increment_pre_release.outputs.new_version }} --no-git-tag-version
+      run: npx vsce package -o rescript-vscode-${{ steps.increment_pre_release.outputs.new_version }}.vsix ${{ steps.increment_pre_release.outputs.new_version }} --no-git-tag-version
+
+    - name: Package Extension release version
+      if: startsWith(github.ref, 'refs/tags/')
+      run: npx vsce package -o rescript-vscode-${{ steps.tag_name.outputs.tag }}.vsix ${{ steps.tag_name.outputs.tag }} --no-git-tag-version
 
     - uses: actions/upload-artifact@v2
       if: github.ref != 'refs/heads/master'
@@ -156,31 +160,16 @@ jobs:
         path: rescript-vscode-${{ steps.vars.outputs.sha_short }}.vsix
 
     - uses: actions/upload-artifact@v2
-      env:
-        RELEASE_VERSION: ${{ steps.increment_pre_release.outputs.release_version }}
-      if: github.ref == 'refs/heads/master' && "${{ env.RELEASE_VERSION != '' }}"
-      uses: marvinpinto/action-automatic-releases@latest
-      with:
-        name: rescript-vscode-${{ env.RELEASE_VERSION }}.vsix
-        path: rescript-vscode-${{ env.RELEASE_VERSION }}.vsix
-
-    - uses: actions/upload-artifact@v2
       if: github.ref == 'refs/heads/master'
       with:
         name: rescript-vscode-${{ steps.increment_pre_release.outputs.new_version }}.vsix
         path: rescript-vscode-${{ steps.increment_pre_release.outputs.new_version }}.vsix
-
-    - name: Publish release version to GitHub
-      env:
-        RELEASE_VERSION: ${{ steps.increment_pre_release.outputs.release_version }}
-      if: github.ref == 'refs/heads/master' && "${{ env.RELEASE_VERSION != '' }}"
-      uses: marvinpinto/action-automatic-releases@latest
+    
+    - uses: actions/upload-artifact@v2
+      if: startsWith(github.ref, 'refs/tags/')
       with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        automatic_release_tag: ${{ env.RELEASE_VERSION }}
-        prerelease: false
-        title: ${{ env.RELEASE_VERSION }}
-        files: rescript-vscode-${{ env.RELEASE_VERSION }}.vsix
+        name: rescript-vscode-${{ steps.tag_name.outputs.tag }}.vsix
+        path: rescript-vscode-${{ steps.tag_name.outputs.tag }}.vsix
 
     - name: Publish latest master to GitHub
       if: github.ref == 'refs/heads/master'
@@ -192,12 +181,19 @@ jobs:
         title: "Latest master"
         files: rescript-vscode-${{ steps.increment_pre_release.outputs.new_version }}.vsix
 
-    - name: Publish extension as release
-      env:
-        RELEASE_VERSION: ${{ steps.increment_pre_release.outputs.release_version }}
-      if: github.ref == 'refs/heads/master' && "${{ env.RELEASE_VERSION != '' }}"
-      run: npx vsce publish --pat ${{ secrets.MARKETPLACE_TOKEN }} ${{ env.RELEASE_VERSION }} --no-git-tag-version
+    - name: Publish release version to GitHub
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: marvinpinto/action-automatic-releases@latest
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        prerelease: false
+        title: ${{ steps.tag_name.outputs.tag }}
+        files: rescript-vscode-${{ steps.tag_name.outputs.tag }}.vsix
 
     - name: Publish extension as pre-release
       if: github.ref == 'refs/heads/master'
       run: npx vsce publish --pat ${{ secrets.MARKETPLACE_TOKEN }} --pre-release ${{ steps.increment_pre_release.outputs.new_version }} --no-git-tag-version
+
+    - name: Publish extension as release
+      if: startsWith(github.ref, 'refs/tags/')
+      run: npx vsce publish --pat ${{ secrets.MARKETPLACE_TOKEN }} ${{ steps.tag_name.outputs.tag }} --no-git-tag-version
