@@ -11,19 +11,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-18.04, windows-latest]
+        os: [ubuntu-18.04]
         # syntax explanation:
         # https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#example-including-additional-values-into-combinations
         include:
-          - os: macos-latest
-            build: eval $(opam env) && cd analysis && make test
-            artifact-folder: darwin
+          # - os: macos-latest
+          #   build: eval $(opam env) && cd analysis && make test
+          #   artifact-folder: darwin
           - os: ubuntu-18.04
             build: eval $(opam env) && cd analysis && make test
             artifact-folder: linux
-          - os: windows-latest
-            build: "cd analysis && & $env:CYGWIN_ROOT\\bin\\ocaml-env exec -- make test"
-            artifact-folder: win32
+          # - os: windows-latest
+          #   build: "cd analysis && & $env:CYGWIN_ROOT\\bin\\ocaml-env exec -- make test"
+          #   artifact-folder: win32
 
     runs-on: ${{matrix.os}}
 
@@ -93,13 +93,13 @@ jobs:
     - run: npm ci
     - run: npm run compile
 
-    - name: Download MacOS binary
-      uses: actions/download-artifact@v3.0.0
-      with:
-        name: macos-latest
-        path: ./server/analysis_binaries
-    - run: tar -xvf binary.tar
-      working-directory: ./server/analysis_binaries
+    # - name: Download MacOS binary
+    #   uses: actions/download-artifact@v3.0.0
+    #   with:
+    #     name: macos-latest
+    #     path: ./server/analysis_binaries
+    # - run: tar -xvf binary.tar
+    #   working-directory: ./server/analysis_binaries
 
     - name: Download Linux binary
       uses: actions/download-artifact@v3.0.0
@@ -109,13 +109,13 @@ jobs:
     - run: tar -xvf binary.tar
       working-directory: ./server/analysis_binaries
 
-    - name: Download Windows binary
-      uses: actions/download-artifact@v3.0.0
-      with:
-        name: windows-latest
-        path: ./server/analysis_binaries
-    - run: tar -xvf binary.tar
-      working-directory: ./server/analysis_binaries
+    # - name: Download Windows binary
+    #   uses: actions/download-artifact@v3.0.0
+    #   with:
+    #     name: windows-latest
+    #     path: ./server/analysis_binaries
+    # - run: tar -xvf binary.tar
+    #   working-directory: ./server/analysis_binaries
 
     - name: Cleanup tar file
       run: rm binary.tar
@@ -132,14 +132,15 @@ jobs:
       id: increment_pre_release
       run: |
         JSON=$(npx vsce show chenglou92.rescript-vscode --json)
-        node .github/workflows/bump-version.js ${JSON}
+        VERSIONS_JSON=$(echo $JSON | jq '[.versions | .[] | .["version"]]')
+        node .github/workflows/bump-version.js "$VERSIONS_JSON"
 
     - name: Package Extension
       if: github.ref != 'refs/heads/master'
       run: npx vsce package  -o rescript-vscode-${{ steps.vars.outputs.sha_short }}.vsix
 
     - name: Package Extension release version (if not already published)
-       env:
+      env:
         RELEASE_VERSION: ${{ steps.increment_pre_release.outputs.release_version }}
       if: github.ref == 'refs/heads/master' && "${{ env.RELEASE_VERSION != '' }}"
       run: npx vsce package  -o rescript-vscode-${{ env.RELEASE_VERSION }}.vsix ${{ env.RELEASE_VERSION }} --no-git-tag-version
@@ -153,6 +154,15 @@ jobs:
       with:
         name: rescript-vscode-${{ steps.vars.outputs.sha_short }}.vsix
         path: rescript-vscode-${{ steps.vars.outputs.sha_short }}.vsix
+
+    - uses: actions/upload-artifact@v2
+      env:
+        RELEASE_VERSION: ${{ steps.increment_pre_release.outputs.release_version }}
+      if: github.ref == 'refs/heads/master' && "${{ env.RELEASE_VERSION != '' }}"
+      uses: marvinpinto/action-automatic-releases@latest
+      with:
+        name: rescript-vscode-${{ env.RELEASE_VERSION }}.vsix
+        path: rescript-vscode-${{ env.RELEASE_VERSION }}.vsix
 
     - uses: actions/upload-artifact@v2
       if: github.ref == 'refs/heads/master'

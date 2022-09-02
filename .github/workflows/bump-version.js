@@ -2,9 +2,10 @@ const fs = require("fs");
 const path = require("path");
 const semver = require("semver");
 
-const json = process.argv[2];
+const versionsJson = process.argv[2];
+const versions = JSON.parse(versionsJson);
 
-const latestPublish = JSON.parse(json).versions[0].version;
+const latestPublish = versions[0];
 
 const packageJson = fs.readFileSync(path.join("./", "package.json"), {
   encoding: "utf-8",
@@ -12,8 +13,8 @@ const packageJson = fs.readFileSync(path.join("./", "package.json"), {
 
 let release = JSON.parse(packageJson).version;
 
-const isLatestRegularVersionPublished = JSON.parse(json).versions.some(
-  (v) => v.version === release
+const isLatestRegularVersionPublished = versions.some(
+  (version) => version === release
 );
 
 if (!isLatestRegularVersionPublished) {
