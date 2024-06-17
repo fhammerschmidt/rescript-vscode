@@ -283,12 +283,6 @@ jobs:
         name: rescript-vscode-${{ steps.tag_name.outputs.tag }}.vsix
         path: rescript-vscode-${{ steps.tag_name.outputs.tag }}.vsix
 
-    - name: Move latest-master tag to current commit
-      if: github.ref == 'refs/heads/master'
-      uses: jimeh/update-tags-action@v1
-      with: 
-        tags: "latest-master"
-
     - name: Publish latest master to GitHub
       if: github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v2
@@ -299,6 +293,12 @@ jobs:
         generate_release_notes: true
         name: "Latest master"
         files: rescript-vscode-latest-master.vsix
+
+    - name: Move latest-master tag to current commit
+      if: github.ref == 'refs/heads/master'
+      uses: jimeh/update-tags-action@v1
+      with: 
+        tags: "latest-master"
 
     - name: Publish release version to GitHub
       if: startsWith(github.ref, 'refs/tags/')
